@@ -126,3 +126,11 @@ native/                  上游 macOS 蓝牙桥接器
 本项目是对上游的修改版本，不是独立重写。基线提交为 `8a13296a3d81dae18ad4481e7a9eca913c2c644f`；Windows 修改日期为 2026-11-03。主要修改：Python helper 跨平台启动、Windows 蓝牙提示、异常清理、Windows 身份目录及 ACL 核验、PowerShell 输出、USB 探测、本地 APK 导入以及 Windows 测试与 CI。
 
 保留上游 [GNU GPL v3](LICENSE)，许可证标识为 `GPL-3.0-only`。第三方认证材料不属于本项目，也不因项目许可证获得重新授权。提交 issue 或 PR 时，请勿附带私钥、证书、配对记录或设备标识符。
+
+## 支持项目
+
+很高兴这个项目能帮到您，您的支持是额外的鼓励。
+
+| 微信 | 支付宝 |
+| :---: | :---: |
+| <img src="docs/assets/donate-wechat.png" alt="微信收款码" width="260"> | <img src="docs/assets/donate-alipay.png" alt="支付宝收款码" width="260"> |
