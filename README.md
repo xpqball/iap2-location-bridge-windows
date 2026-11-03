@@ -133,6 +133,4 @@ native/                  上游 macOS 蓝牙桥接器
 
 很高兴这个项目能帮到您，您的支持是额外的鼓励。
 
-| 微信 | 支付宝 |
-| :---: | :---: |
-| <img src="docs/assets/donate-wechat.png" alt="微信收款码" width="260"> | <img src="docs/assets/donate-alipay.png" alt="支付宝收款码" width="260"> |
+[<img src="docs/assets/donate-cards.png" alt="微信支付与支付宝收款码" width="720">](docs/assets/donate-cards.png)
