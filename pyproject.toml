@@ -1,19 +1,20 @@
 [project]
-name = "accessory-location"
+name = "iap2-location-bridge-windows"
 version = "0.1.0"
-description = "Local iAP2 accessory-location client for macOS"
+description = "iAP2 Location Bridge for Windows, with upstream macOS transport support"
 readme = "README.md"
 license = "GPL-3.0-only"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
-dependencies = ["cryptography>=43", "pymobiledevice3>=9.40,<10"]
+dependencies = ["cryptography>=43", "pymobiledevice3>=9.40,<10", "pywin32>=306; sys_platform == 'win32'"]
 
 [project.urls]
-Repository = "https://github.com/aur3l14no/accessory-location"
-Issues = "https://github.com/aur3l14no/accessory-location/issues"
+Repository = "https://github.com/xpqball/iap2-location-bridge-windows"
+Issues = "https://github.com/xpqball/iap2-location-bridge-windows/issues"
+Upstream = "https://github.com/aur3l14no/accessory-location"
 
 [project.scripts]
-accessory-location = "accessory_location.cli:main"
+iap2-location-bridge-windows = "iap2_location_bridge_windows.cli:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -35,4 +36,4 @@ target-version = "py311"
 select = ["E4", "E7", "E9", "F", "I", "UP"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/accessory_location"]
+packages = ["src/iap2_location_bridge_windows"]

@@ -25,3 +25,13 @@ research/
 *.log
 *.apk
 *.dmg
+
+# Local experiments, packaging, and editor state.
+WINDOWS_*.md
+local-notes/
+*.zip
+*.tar.gz
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini

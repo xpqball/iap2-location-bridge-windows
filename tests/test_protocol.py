@@ -4,9 +4,9 @@ from datetime import UTC, datetime
 
 import pytest
 
-from accessory_location.link import Link
-from accessory_location.profile import coordinate, identity, location_sentences, sentence
-from accessory_location.wire import (
+from iap2_location_bridge_windows.link import Link
+from iap2_location_bridge_windows.profile import coordinate, identity, location_sentences, sentence
+from iap2_location_bridge_windows.wire import (
     ACK,
     SYN,
     Message,

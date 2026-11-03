@@ -9,7 +9,7 @@ build/bluetooth-bridge: native/bluetooth_bridge.m | build
 	xcrun clang -fobjc-arc -framework Foundation -framework IOBluetooth $< -o $@
 
 test:
-	uv run pytest -q
+	uv run pytest -p no:xonsh -q
 
 check:
 	uv run ruff check src tests tools

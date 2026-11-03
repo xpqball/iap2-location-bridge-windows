@@ -13,8 +13,8 @@ from cryptography.hazmat.primitives.asymmetric import ec, utils
 from cryptography.hazmat.primitives.serialization import pkcs7
 from cryptography.x509.oid import NameOID
 
-from accessory_location.auth import AuthenticationProvider
-from accessory_location.wire import parameters
+from iap2_location_bridge_windows.auth import AuthenticationProvider
+from iap2_location_bridge_windows.wire import parameters
 
 HELPER = Path(__file__).resolve().parents[1] / "tools" / "local_mfi_v3_helper.py"
 
@@ -57,8 +57,8 @@ async def expect_error(cert_bytes, key_bytes, cert_file, key_file, phrase):
 async def run_in_directory(directory):
     cert_file = directory / "untrusted-test.p7b"
     key_file = directory / "untrusted-test.pk8"
-    os.environ["ACCESSORY_MFI_CERT_FILE"] = str(cert_file)
-    os.environ["ACCESSORY_MFI_KEY_FILE"] = str(key_file)
+    os.environ["IAP2_LOCATION_BRIDGE_WINDOWS_CERT_FILE"] = str(cert_file)
+    os.environ["IAP2_LOCATION_BRIDGE_WINDOWS_KEY_FILE"] = str(key_file)
     key = ec.generate_private_key(ec.SECP256R1())
     certificate = make_certificate(key)
     cert_bytes = pkcs7.serialize_certificates([certificate], serialization.Encoding.DER)
@@ -151,7 +151,7 @@ async def test_ephemeral_local_mfi_v3_helper(tmp_path, monkeypatch):
     # Replace both inherited paths before starting any helper subprocess.
     with TemporaryDirectory(prefix="ephemeral-mfi-check-", dir=tmp_path) as temp:
         directory = Path(temp)
-        monkeypatch.setenv("ACCESSORY_MFI_CERT_FILE", str(directory / "untrusted-test.p7b"))
-        monkeypatch.setenv("ACCESSORY_MFI_KEY_FILE", str(directory / "untrusted-test.pk8"))
+        monkeypatch.setenv("IAP2_LOCATION_BRIDGE_WINDOWS_CERT_FILE", str(directory / "untrusted-test.p7b"))
+        monkeypatch.setenv("IAP2_LOCATION_BRIDGE_WINDOWS_KEY_FILE", str(directory / "untrusted-test.pk8"))
         await run_in_directory(directory)
     assert not directory.exists()

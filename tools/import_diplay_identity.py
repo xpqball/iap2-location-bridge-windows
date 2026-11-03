@@ -33,6 +33,72 @@ class IdentityImportError(Exception):
     pass
 
 
+def default_identity_dir():
+    if sys.platform == "win32":
+        return Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local")) / (
+            "iap2-location-bridge-windows/identity"
+        )
+    return Path.home() / "Library/Application Support/iap2-location-bridge-windows/identity"
+
+
+def create_private_directory(destination):
+    if sys.platform != "win32":
+        destination.mkdir(mode=0o700)
+        return
+    import ntsecuritycon
+    import win32api
+    import win32con
+    import win32file
+    import win32security
+
+    token = win32security.OpenProcessToken(win32api.GetCurrentProcess(), win32con.TOKEN_QUERY)
+    try:
+        sid = win32security.GetTokenInformation(token, win32security.TokenUser)[0]
+    finally:
+        token.Close()
+    acl = win32security.ACL()
+    acl.AddAccessAllowedAceEx(
+        win32security.ACL_REVISION,
+        win32con.OBJECT_INHERIT_ACE | win32con.CONTAINER_INHERIT_ACE,
+        ntsecuritycon.FILE_ALL_ACCESS,
+        sid,
+    )
+    descriptor = win32security.SECURITY_DESCRIPTOR()
+    descriptor.SetSecurityDescriptorDacl(1, acl, 0)
+    descriptor.SetSecurityDescriptorControl(
+        win32security.SE_DACL_PROTECTED, win32security.SE_DACL_PROTECTED
+    )
+    attributes = win32security.SECURITY_ATTRIBUTES()
+    attributes.SECURITY_DESCRIPTOR = descriptor
+    # Apply the protected DACL at creation, before any private bytes are written.
+    win32file.CreateDirectory(str(destination), attributes)
+    try:
+        actual = win32security.GetFileSecurity(
+            str(destination), win32security.DACL_SECURITY_INFORMATION
+        )
+        actual_acl = actual.GetSecurityDescriptorDacl()
+        if (not actual.GetSecurityDescriptorControl()[0] & win32security.SE_DACL_PROTECTED
+                or actual_acl is None or actual_acl.GetAceCount() != 1):
+            raise IdentityImportError("Directory ACL is not protected and current-user-only")
+        header, mask, actual_sid = actual_acl.GetAce(0)
+        inherit = win32con.OBJECT_INHERIT_ACE | win32con.CONTAINER_INHERIT_ACE
+        if (header[0] != win32security.ACCESS_ALLOWED_ACE_TYPE
+                or header[1] != inherit
+                or mask != ntsecuritycon.FILE_ALL_ACCESS or actual_sid != sid):
+            raise IdentityImportError("Directory ACL does not grant inheritable current-user access")
+    except Exception as error:
+        # No credential bytes have been written. Remove only the directory we created.
+        destination.rmdir()
+        raise IdentityImportError("Could not verify the private directory ACL") from error
+
+
+def environment_assignment(variable, path):
+    if sys.platform == "win32":
+        escaped = str(path).replace("'", "''")
+        return f"$env:{variable} = '{escaped}'"
+    return f"export {variable}={shlex.quote(str(path))}"
+
+
 def destination_path(path):
     expanded = path.expanduser()
     if expanded.is_symlink():
@@ -46,7 +112,7 @@ def destination_path(path):
 
 
 def download_apk(stream):
-    request = urllib.request.Request(APK_URL, headers={"User-Agent": "accessory-location"})
+    request = urllib.request.Request(APK_URL, headers={"User-Agent": "iap2-location-bridge-windows"})
     with urllib.request.urlopen(request, timeout=30) as response:
         if not response.geturl().startswith("https://"):
             raise IdentityImportError("Download redirected outside HTTPS")
@@ -66,7 +132,8 @@ def read_identity(stream, expected_digest=None):
     if len(archive_bytes) > MAX_APK_BYTES:
         raise IdentityImportError("APK exceeds the size limit")
     if hashlib.sha256(archive_bytes).hexdigest() != (expected_digest or APK_SHA256):
-        raise IdentityImportError("APK SHA-256 mismatch; expected the pinned DiPlay v0.2.7 release")
+        expected = "the supplied SHA-256" if expected_digest else "the pinned DiPlay v0.2.7 release"
+        raise IdentityImportError(f"APK SHA-256 mismatch; expected {expected}")
     identity = {}
     with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
         names = archive.namelist()
@@ -88,7 +155,7 @@ def read_identity(stream, expected_digest=None):
 def write_identity(identity, destination):
     destination = destination_path(destination)
     destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    destination.mkdir(mode=0o700)
+    create_private_directory(destination)
     created = []
     try:
         for filename in ASSETS:
@@ -114,7 +181,7 @@ def main(argv=None):
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path.home() / "Library/Application Support/accessory-location/identity",
+        default=default_identity_dir(),
         help="new directory outside the checkout (existing directories are never overwritten)",
     )
     args = parser.parse_args(argv)
@@ -139,10 +206,10 @@ def main(argv=None):
     print("Local validation passed; device acceptance is not guaranteed.")
     print("Set these variables in the shell that will run the client:")
     for variable, filename in (
-        ("ACCESSORY_MFI_CERT_FILE", "certificate.p7b"),
-        ("ACCESSORY_MFI_KEY_FILE", "identity.pk8"),
+        ("IAP2_LOCATION_BRIDGE_WINDOWS_CERT_FILE", "certificate.p7b"),
+        ("IAP2_LOCATION_BRIDGE_WINDOWS_KEY_FILE", "identity.pk8"),
     ):
-        print(f"export {variable}={shlex.quote(str(destination / filename))}")
+        print(environment_assignment(variable, destination / filename))
     return 0
 
 

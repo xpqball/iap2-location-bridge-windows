@@ -2,8 +2,8 @@
 """Local MFi-v3 JSONL authentication helper; supplies no accessory identity.
 
 Requires cryptography in the interpreter environment. Configure caller-provided files:
-  ACCESSORY_MFI_CERT_FILE=/path/to/certificate.p7b
-  ACCESSORY_MFI_KEY_FILE=/path/to/identity.pk8
+  IAP2_LOCATION_BRIDGE_WINDOWS_CERT_FILE=/path/to/certificate.p7b
+  IAP2_LOCATION_BRIDGE_WINDOWS_KEY_FILE=/path/to/identity.pk8
 
 The certificate must be a DER PKCS#7 container with one matching non-CA leaf.
 The matching private key must be unencrypted DER PKCS#8 P-256. This helper checks
@@ -124,8 +124,8 @@ class LocalMfiV3:
     def load(self):
         if self.key is not None:
             return
-        certificate = read_identity_file("ACCESSORY_MFI_CERT_FILE")
-        encoded_key = read_identity_file("ACCESSORY_MFI_KEY_FILE")
+        certificate = read_identity_file("IAP2_LOCATION_BRIDGE_WINDOWS_CERT_FILE")
+        encoded_key = read_identity_file("IAP2_LOCATION_BRIDGE_WINDOWS_KEY_FILE")
         key = validate_identity(certificate, encoded_key)
         self.key = key
         self.certificate = certificate

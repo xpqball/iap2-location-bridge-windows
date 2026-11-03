@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import json
 import math
+import sys
 
 from pymobiledevice3.lockdown import create_using_usbmux
 
@@ -111,16 +112,20 @@ async def run(args):
             phone_location_verified=False,
         )
     finally:
-        if link is not None:
-            await link.close()
-        if phone is not None:
-            await phone.close()
-        if auth is not None:
-            await auth.close()
+        try:
+            if link is not None:
+                await link.close()
+        finally:
+            try:
+                if phone is not None:
+                    await phone.close()
+            finally:
+                if auth is not None:
+                    await auth.close()
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Experimental iAP2 accessory-location client")
+    parser = argparse.ArgumentParser(prog="iap2-location-bridge-windows", description="iAP2 Location Bridge for Windows")
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("probe", "send"):
         command = commands.add_parser(name)
@@ -136,6 +141,8 @@ def main():
             command.add_argument("--longitude", type=float, required=True)
             command.add_argument("--interval", type=float, default=1)
     args = parser.parse_args()
+    if sys.platform == "win32" and args.transport == "bluetooth":
+        parser.error("Windows Bluetooth transport is not implemented; use --transport usb")
     if args.transport == "bluetooth" and not args.device:
         parser.error("Bluetooth transport requires --device with the paired iPhone address")
     if not math.isfinite(args.duration) or not 0 < args.duration <= 3600:

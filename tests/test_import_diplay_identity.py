@@ -56,12 +56,18 @@ def test_import_exact_assets_and_private_permissions(importer, identity, tmp_pat
         assert importer.write_identity(result, destination) == destination
     finally:
         os.umask(old_umask)
-    assert stat.S_IMODE(destination.stat().st_mode) == 0o700
+    if os.name == "nt":
+        assert_private_windows_acl(destination, protected=True)
+    else:
+        assert stat.S_IMODE(destination.stat().st_mode) == 0o700
     assert {path.name for path in destination.iterdir()} == set(identity)
     for name, value in identity.items():
         path = destination / name
         assert path.read_bytes() == value
-        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+        if os.name == "nt":
+            assert_private_windows_acl(path)
+        else:
+            assert stat.S_IMODE(path.stat().st_mode) == 0o600
     assert not (tmp_path / "unexpected.txt").exists()
 
 
@@ -108,8 +114,16 @@ def test_refuse_existing_checkout_and_symlink_destinations(importer, identity, t
     assert sentinel.read_text() == "original"
     with pytest.raises(importer.IdentityImportError, match="outside the repository"):
         importer.destination_path(importer.CHECKOUT / "new-identity")
+
+
+def test_refuse_symlink_destinations(importer, tmp_path):
     link = tmp_path / "link"
-    link.symlink_to(tmp_path / "missing", target_is_directory=True)
+    try:
+        link.symlink_to(tmp_path / "missing", target_is_directory=True)
+    except OSError as error:
+        if getattr(error, "winerror", None) == 1314:
+            pytest.skip("Windows symlink creation requires Developer Mode or privilege")
+        raise
     with pytest.raises(importer.IdentityImportError, match="symbolic link"):
         importer.destination_path(link)
     alias = tmp_path / "checkout-alias"
@@ -156,8 +170,11 @@ def test_cli_import_with_synthetic_release(
         args = ["--download"]
     assert importer.main([*args, "--output-dir", str(destination)]) == 0
     output = capsys.readouterr().out
-    assert "export ACCESSORY_MFI_CERT_FILE='" in output
-    assert "export ACCESSORY_MFI_KEY_FILE='" in output
+    for variable, filename in (
+        ("IAP2_LOCATION_BRIDGE_WINDOWS_CERT_FILE", "certificate.p7b"),
+        ("IAP2_LOCATION_BRIDGE_WINDOWS_KEY_FILE", "identity.pk8"),
+    ):
+        assert importer.environment_assignment(variable, destination / filename) in output
     assert "not guaranteed" in output
     assert (destination / "identity.pk8").read_bytes() == identity["identity.pk8"]
 
@@ -178,3 +195,85 @@ def test_download_is_bounded(importer, monkeypatch):
     monkeypatch.setattr(importer.urllib.request, "urlopen", lambda *a, **kw: response)
     with pytest.raises(importer.IdentityImportError, match="download size limit"):
         importer.download_apk(io.BytesIO())
+
+
+def assert_private_windows_acl(path, protected=False):
+    import ntsecuritycon
+    import win32api
+    import win32con
+    import win32security
+
+    token = win32security.OpenProcessToken(win32api.GetCurrentProcess(), win32con.TOKEN_QUERY)
+    try:
+        user = win32security.GetTokenInformation(token, win32security.TokenUser)[0]
+    finally:
+        token.Close()
+    descriptor = win32security.GetFileSecurity(str(path), win32security.DACL_SECURITY_INFORMATION)
+    if protected:
+        assert descriptor.GetSecurityDescriptorControl()[0] & win32security.SE_DACL_PROTECTED
+    acl = descriptor.GetSecurityDescriptorDacl()
+    assert acl is not None and acl.GetAceCount() == 1
+    header, mask, sid = acl.GetAce(0)
+    assert header[0] == win32security.ACCESS_ALLOWED_ACE_TYPE
+    assert sid == user
+    assert mask == ntsecuritycon.FILE_ALL_ACCESS
+
+
+def test_windows_shell_quoting_and_default(importer, monkeypatch):
+    monkeypatch.setattr(importer.sys, "platform", "win32")
+    monkeypatch.setenv("LOCALAPPDATA", str(Path.home() / "Local Test"))
+    assert importer.default_identity_dir() == Path.home() / "Local Test/iap2-location-bridge-windows/identity"
+    assert importer.environment_assignment("TEST", "a'b c") == "$env:TEST = 'a''b c'"
+
+
+@pytest.mark.parametrize("case", ["valid", "wrong_digest", "invalid_digest", "existing"])
+def test_local_apk_cli(importer, identity, tmp_path, monkeypatch, capsys, case):
+    local = importlib.import_module("import_local_identity")
+    data = apk_bytes(importer, identity)
+    apk = tmp_path / "user-supplied.apk"
+    apk.write_bytes(data)
+    destination = tmp_path / "local identity"
+    digest = hashlib.sha256(data).hexdigest().upper()
+    if case == "wrong_digest":
+        digest = "0" * 64
+    elif case == "invalid_digest":
+        digest = "invalid"
+    elif case == "existing":
+        destination.mkdir()
+        (destination / "sentinel").write_text("original")
+    monkeypatch.setattr(local.sys, "argv", [
+        "import_local_identity.py", "--apk", str(apk), "--sha256", digest,
+        "--output-dir", str(destination),
+    ])
+    if case == "invalid_digest":
+        with pytest.raises(SystemExit) as error:
+            local.main()
+        assert error.value.code == 2
+        assert not destination.exists()
+    elif case == "valid":
+        assert local.main() == 0
+        assert (destination / "identity.pk8").read_bytes() == identity["identity.pk8"]
+    elif case == "wrong_digest":
+        assert local.main() == 1
+        error = capsys.readouterr().err
+        assert "SHA-256 mismatch" in error
+        assert "v0.2.7" not in error
+        assert not destination.exists()
+    else:
+        assert local.main() == 1
+        assert (destination / "sentinel").read_text() == "original"
+        assert not (destination / "identity.pk8").exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows ACL enforcement")
+def test_no_private_data_written_if_acl_cannot_be_verified(importer, identity, tmp_path, monkeypatch):
+    import win32security
+
+    def unavailable(*args):
+        raise OSError("security descriptors unavailable")
+
+    destination = tmp_path / "identity"
+    monkeypatch.setattr(win32security, "GetFileSecurity", unavailable)
+    with pytest.raises(importer.IdentityImportError, match="ACL"):
+        importer.write_identity(identity, destination)
+    assert not destination.exists()

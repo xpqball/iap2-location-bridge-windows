@@ -10,8 +10,8 @@ Configure these environment variables before running the client:
 
 | Variable | Required file |
 | --- | --- |
-| `ACCESSORY_MFI_CERT_FILE` | DER PKCS#7 certificate container |
-| `ACCESSORY_MFI_KEY_FILE` | Unencrypted DER PKCS#8 P-256 private key |
+| `IAP2_LOCATION_BRIDGE_WINDOWS_CERT_FILE` | DER PKCS#7 certificate container |
+| `IAP2_LOCATION_BRIDGE_WINDOWS_KEY_FILE` | Unencrypted DER PKCS#8 P-256 private key |
 
 `tools/local_mfi_v3_helper.py` preserves the complete certificate container and
 requires exactly one non-CA P-256 leaf matching the key. It limits input sizes
@@ -65,15 +65,29 @@ checks. It never installs or executes the APK, connects to a phone, or sends
 coordinates. Downloaded APK data is temporary; an APK supplied with `--apk` is
 left untouched.
 
-The default destination is
-`~/Library/Application Support/accessory-location/identity`. Use `--output-dir`
-to choose another new directory outside the checkout. The directory has mode
-`0700` and both files have mode `0600`. Existing destinations are never overwritten;
-a failed write removes the partial identity. The importer prints paths and shell
-commands, not key or certificate contents. Copy its two `export` commands into
-the shell used to run the client.
+The default destination on Windows is
+`%LOCALAPPDATA%\iap2-location-bridge-windows\identity`; on macOS it is
+`~/Library/Application Support/iap2-location-bridge-windows/identity`. Use `--output-dir`
+to choose another new directory outside the checkout. On Windows, a protected
+current-user-only DACL is applied when the directory is created, before writing
+private bytes; the resulting DACL is read back and verified before file creation.
+If verification fails, import aborts without writing credentials. Files inherit
+that ACL. Administrators can still take ownership.
+On POSIX, the directory has mode `0700` and files have mode `0600`.
+Existing destinations are never overwritten; a failed write removes the partial
+identity. Output contains paths and shell commands, not credential contents.
+Copy the printed PowerShell assignments (Windows) or `export` commands (macOS)
+into the shell used to run the client.
 
-Run import before applying `tools/local-only.sb`: `--download` needs HTTPS access,
+For a different user-supplied APK with the same asset layout, use
+`tools/import_local_identity.py --apk PATH --sha256 SHA256 --output-dir DIRECTORY`.
+This requires an explicit SHA-256 and performs the same bounded extraction,
+format validation, and protected storage. A locally computed digest identifies
+the input bytes; it does not independently prove publisher authenticity or
+permission to use the bundled identity. The pinned importer above retains its
+original v0.2.7 check.
+
+On macOS, run import before applying `tools/local-only.sb`: `--download` needs HTTPS access,
 while the sender and authentication helper need only the resulting local files.
 
 ## Helper contract

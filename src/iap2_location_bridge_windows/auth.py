@@ -3,6 +3,8 @@
 import asyncio
 import base64
 import json
+import sys
+from pathlib import Path
 
 from .wire import Message, ProtocolError, parameter
 
@@ -16,8 +18,11 @@ class AuthenticationProvider:
 
     async def request(self, operation, **fields):
         if self.process is None:
+            command = [self.executable]
+            if Path(self.executable).suffix.lower() == ".py":
+                command.insert(0, sys.executable)
             self.process = await asyncio.create_subprocess_exec(
-                self.executable,
+                *command,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 limit=128 * 1024,

@@ -1,4 +1,4 @@
-name: CI
+name: iAP2 Location Bridge for Windows CI
 
 on:
   push:
@@ -14,7 +14,10 @@ concurrency:
 
 jobs:
   check:
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -25,5 +28,6 @@ jobs:
           python-version: '3.11'
       - run: uv sync --locked
       - run: uv run ruff check src tests tools
-      - run: uv run pytest -q
+      - run: uv run pytest -p no:xonsh -q
       - run: make native
+        if: runner.os == 'macOS'

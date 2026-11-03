@@ -2,8 +2,8 @@ import base64
 
 import pytest
 
-from accessory_location.auth import AuthenticationProvider
-from accessory_location.wire import ProtocolError, parameters
+from iap2_location_bridge_windows.auth import AuthenticationProvider
+from iap2_location_bridge_windows.wire import ProtocolError, parameters
 
 
 class Provider(AuthenticationProvider):
@@ -44,3 +44,24 @@ async def test_challenge_passed_unchanged_to_provider():
 async def test_incomplete_identity_rejected(response):
     with pytest.raises(ProtocolError):
         await Provider(response).certificate()
+
+
+@pytest.mark.parametrize("suffix", [".py", ".PY"])
+async def test_python_helper_in_path_with_spaces(tmp_path, suffix):
+    directory = tmp_path / "helper with spaces"
+    directory.mkdir()
+    helper = directory / f"local helper{suffix}"
+    helper.write_text(
+        "import json, sys\n"
+        "for line in sys.stdin:\n"
+        "    request = json.loads(line)\n"
+        "    print(json.dumps({'operation': request['op']}), flush=True)\n",
+        encoding="utf-8",
+    )
+    provider = AuthenticationProvider(str(helper))
+    try:
+        assert await provider.request("certificate") == {"operation": "certificate"}
+        assert await provider.request("sign") == {"operation": "sign"}
+    finally:
+        await provider.close()
+    assert provider.process.returncode == 0

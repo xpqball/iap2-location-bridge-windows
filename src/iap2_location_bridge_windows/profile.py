@@ -11,7 +11,10 @@ def identity(transport="usb", bluetooth_address: bytes | None = None) -> Message
     fields = [
         text_parameter(i, v)
         for i, v in enumerate(
-            ("Accessory Location Lab", "AL-1", "Local Research", "AL-LOCAL-001", "0.1", "1")
+            (
+                "iAP2 Location Bridge for Windows", "ILBW-1", "iAP2 Location Bridge",
+                "ILBW-LOCAL-001", "0.1.0", "1",
+            )
         )
     ]
     fields += [
