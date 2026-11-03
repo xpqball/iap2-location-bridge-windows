@@ -6,6 +6,8 @@
 
 仓库、Python 分发包及命令行入口统一为 `iap2-location-bridge-windows`；Python 模块为 `iap2_location_bridge_windows`。
 
+可通过 USB 修改 iPhone 定位，辅助研究 Apple Watch 地区限定功能（如高血压通知）的可用性。目前只验证过 iPhone 地图位置变化，尚未验证这些 Apple Watch 功能能否启用；本项目不保证能够启用中国大陆尚未开放的服务，功能支持情况以 Apple 官方说明为准。
+
 **实验性项目 · GPL-3.0-only**。需要设备接受的配件证书及匹配私钥，仓库不附带认证材料。此工具不读取手机最终采用的位置，不承诺解锁任何地区限定功能。
 
 ## 支持范围
